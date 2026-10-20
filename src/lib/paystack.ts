@@ -158,9 +158,24 @@ export interface PaystackTransactionConfig {
 /**
  * Initialize Paystack Inline Popup
  */
-export function initializePaystackPayment(config: PaystackTransactionConfig) {
-  const publicKey =
-    process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_placeholder_key";
+export async function initializePaystackPayment(config: PaystackTransactionConfig) {
+  let publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+
+  if (!publicKey || publicKey.startsWith("pk_test_placeholder")) {
+    try {
+      const res = await fetch("/api/paystack/key");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.publicKey) publicKey = data.publicKey;
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  if (!publicKey) {
+    publicKey = "pk_test_1e8c2a41206ed969085cf2124d11bdc89b2785bf";
+  }
 
   if (typeof window === "undefined") return;
 
@@ -171,7 +186,7 @@ export function initializePaystackPayment(config: PaystackTransactionConfig) {
     script.id = "paystack-inline-js";
     script.src = "https://js.paystack.co/v1/inline.js";
     script.async = true;
-    script.onload = () => triggerPaystackPopup(config, publicKey);
+    script.onload = () => triggerPaystackPopup(config, publicKey!);
     document.body.appendChild(script);
   } else {
     triggerPaystackPopup(config, publicKey);
