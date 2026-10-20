@@ -47,28 +47,37 @@ export async function sendSMS({ to, message }: SMSPayload): Promise<{ success: b
   }
 
   try {
-    // 2. Arkesel (Popular Ghana SMS Provider: arkesel.com)
+    // 2. Arkesel (Using the official Arkesel SMS API URL)
     if (provider.toLowerCase() === "arkesel") {
-      const res = await fetch("https://sms.arkesel.com/api/v2/sms/send", {
-        method: "POST",
-        headers: {
-          "api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sender: senderId,
-          message: message,
-          recipients: [formattedPhone],
-        }),
-      });
-      const data = await res.json();
-      console.log("[ARKESEL RESPONSE]", data);
+      const arkeselUrl = `https://sms.arkesel.com/sms/api?action=send-sms&api_key=${encodeURIComponent(
+        apiKey
+      )}&to=${encodeURIComponent(formattedPhone)}&from=${encodeURIComponent(
+        senderId
+      )}&sms=${encodeURIComponent(message)}`;
+
+      const res = await fetch(arkeselUrl, { method: "GET" });
+      const rawText = await res.text();
+      console.log("[ARKESEL DISPATCH RESPONSE]", rawText);
+
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { raw: rawText };
+      }
+
       const isSuccess =
-        res.ok && (data.status === "success" || data.status === 200 || data.code === "ok");
+        res.ok &&
+        (rawText.toLowerCase().includes("success") ||
+          data.code === "ok" ||
+          data.status === "success" ||
+          data.code === "100" ||
+          rawText.toLowerCase().includes("100"));
+
       return {
         success: isSuccess,
-        messageId: data.data?.[0]?.id || data.id || data.message_id,
-        error: isSuccess ? undefined : data.message || JSON.stringify(data),
+        messageId: data.id || data.main_id || `ARK_${Date.now()}`,
+        error: isSuccess ? undefined : rawText,
       };
     }
 
@@ -153,4 +162,37 @@ export async function sendRescheduleSMS(
 ) {
   const message = `[Braosei Studios Update] Hi ${clientName}, your studio session (${bookingId}) has been rescheduled to ${newDate} at ${newTimeSlot}. Location: F. W. H Migeod Ave, Takoradi. See you then!`;
   return sendSMS({ to: phone, message });
+}
+
+/**
+ * Check remaining SMS balance from Arkesel
+ */
+export async function checkSMSBalance(): Promise<{
+  success: boolean;
+  balance?: number;
+  user?: string;
+  country?: string;
+  error?: string;
+}> {
+  const apiKey = process.env.SMS_API_KEY;
+  if (!apiKey) return { success: false, error: "No SMS_API_KEY configured" };
+
+  try {
+    const res = await fetch(
+      `https://sms.arkesel.com/sms/api?action=check-balance&api_key=${encodeURIComponent(
+        apiKey
+      )}&response=json`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) throw new Error("Balance check request failed");
+    const data = await res.json();
+    return {
+      success: true,
+      balance: data.balance,
+      user: data.user,
+      country: data.country,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
