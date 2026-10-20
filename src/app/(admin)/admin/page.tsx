@@ -14,6 +14,10 @@ import {
   Sparkles,
   Lock,
   Unlock,
+  MessageSquare,
+  Send,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -33,6 +37,31 @@ export default function AdminDashboardPage() {
     new Date().toISOString().split("T")[0]
   );
   const [blockReason, setBlockReason] = useState<string>("");
+
+  // SMS Gateway test state
+  const [testPhone, setTestPhone] = useState<string>("");
+  const [testingSms, setTestingSms] = useState<boolean>(false);
+  const [smsTestResult, setSmsTestResult] = useState<any>(null);
+
+  const handleTestSms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testPhone.trim()) return;
+    setTestingSms(true);
+    setSmsTestResult(null);
+    try {
+      const res = await fetch("/api/sms/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: testPhone }),
+      });
+      const data = await res.json();
+      setSmsTestResult(data);
+    } catch (err: any) {
+      setSmsTestResult({ success: false, error: err.message });
+    } finally {
+      setTestingSms(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -326,7 +355,77 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 3. RECENT BOOKINGS & MANAGEMENT TABLE */}
+      {/* 3. SMS GATEWAY DIAGNOSTICS & TEST TOOL */}
+      <div className="bg-white border border-[#E8E2D8] rounded-3xl p-7 sm:p-8 shadow-[0_4px_24px_rgba(26,23,22,0.03)]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 pb-5 border-b border-[#E8E2D8]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#F7F2E7] border border-[#EFE8DA] flex items-center justify-center text-[#C2A878]">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-serif text-xl font-bold text-[#1A1716]">
+                SMS Dispatch & Client Prompt Gateway
+              </h3>
+              <p className="text-xs text-[#7A736E] font-light">
+                Sends automated booking confirmations, 1-hour session prompts, and rescheduling alerts across Ghana.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleTestSms} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Enter phone number to test SMS (e.g. 0244123456 or +233...)"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              className="w-full bg-[#FAF8F5] border border-[#E8E2D8] rounded-xl px-4 py-3 text-xs sm:text-sm text-[#1A1716] placeholder-[#A49E99] focus:outline-none focus:border-[#C2A878] focus:bg-white transition"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={testingSms || !testPhone.trim()}
+            className="px-6 py-3 rounded-xl bg-[#C2A878] hover:bg-[#B29766] text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition disabled:opacity-50 shadow-xs"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>{testingSms ? "Sending Test..." : "Send Test SMS"}</span>
+          </button>
+        </form>
+
+        {smsTestResult && (
+          <div
+            className={`mt-4 p-4 rounded-2xl border text-xs flex items-start gap-2.5 ${
+              smsTestResult.success
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-red-50 border-red-200 text-red-700"
+            }`}
+          >
+            {smsTestResult.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            )}
+            <div className="space-y-1">
+              <span className="font-bold block">
+                {smsTestResult.success ? "SMS Gateway Operational" : "SMS Test Notice"}
+              </span>
+              <p>{smsTestResult.message || smsTestResult.error}</p>
+              <div className="text-[11px] opacity-80 pt-1">
+                Provider: <strong>{smsTestResult.provider || "simulated"}</strong> • Sender ID: <strong>{smsTestResult.senderId || "Braosei"}</strong>
+                {!smsTestResult.hasApiKeyConfigured && (
+                  <span className="block mt-0.5 text-amber-700">
+                    ℹ Currently in simulated mode. Add your SMS API key to <code>.env.local</code> to deliver real SMS to mobile networks.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 4. RECENT BOOKINGS & MANAGEMENT TABLE */}
       <div>
         <div className="mb-4">
           <h2 className="font-serif text-2xl font-bold text-[#1A1716]">Scheduled Sessions</h2>
