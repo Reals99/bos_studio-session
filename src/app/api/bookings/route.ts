@@ -7,6 +7,7 @@ import {
   rescheduleBooking,
 } from "@/lib/db";
 import { calculatePaymentBreakdown, STUDIO_PACKAGES } from "@/lib/paystack";
+import { sendBookingConfirmationSMS, sendRescheduleSMS } from "@/lib/sms";
 
 export async function GET() {
   try {
@@ -76,6 +77,16 @@ export async function POST(req: Request) {
       reference: reference || `REF_${Date.now()}`,
     });
 
+    // Send confirmation SMS to client (async)
+    sendBookingConfirmationSMS(
+      clientPhone,
+      clientName,
+      selectedPkg.name,
+      date,
+      timeSlot,
+      newBooking.id
+    ).catch((err) => console.error("Confirmation SMS failed:", err));
+
     return NextResponse.json({ success: true, booking: newBooking });
   } catch (error) {
     console.error("Failed to create booking:", error);
@@ -105,6 +116,16 @@ export async function PATCH(req: Request) {
           { status: 404 }
         );
       }
+
+      // Send rescheduling SMS to client (async)
+      sendRescheduleSMS(
+        result.booking.clientPhone,
+        result.booking.clientName,
+        newDate,
+        newTimeSlot,
+        result.booking.id
+      ).catch((err) => console.error("Reschedule SMS failed:", err));
+
       return NextResponse.json({
         success: true,
         booking: result.booking,
