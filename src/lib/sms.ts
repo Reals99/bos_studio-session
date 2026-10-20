@@ -62,7 +62,14 @@ export async function sendSMS({ to, message }: SMSPayload): Promise<{ success: b
         }),
       });
       const data = await res.json();
-      return { success: res.ok, messageId: data.data?.[0]?.id || data.id };
+      console.log("[ARKESEL RESPONSE]", data);
+      const isSuccess =
+        res.ok && (data.status === "success" || data.status === 200 || data.code === "ok");
+      return {
+        success: isSuccess,
+        messageId: data.data?.[0]?.id || data.id || data.message_id,
+        error: isSuccess ? undefined : data.message || JSON.stringify(data),
+      };
     }
 
     // 3. mNotify (Ghana SMS Provider: mnotify.com)
